@@ -1,0 +1,53 @@
+{
+    "name": "Smithy",
+    "costOfLiving": [
+        {
+            "name": "Food",
+            "quantity": 1
+        }
+    ],
+    "limitGoods": [
+        {
+            "name": "Tools",
+            "quantity": 4
+        }
+    ],
+    "idealQuantity": [
+        {
+            "name": "Food",
+            "quantity": 3
+        },
+        {
+            "name": "Tools",
+            "quantity": 0
+        },
+        {
+            "name": "Metal",
+            "quantity": 5
+        }
+    ],
+    "startQuantity": [
+        {
+            "name": "Food",
+            "quantity": 1
+        }
+    ],
+    "possibleDeltas": [
+        {
+            "consumes": [
+                {
+                    "name": "Metal",
+                    "quantity": 1,
+                    "possibility": 1.0
+                }
+            ],
+            "produces": [
+                {
+                    "name": "Tools",
+                    "quantity": 1,
+                    "possibility": 1.0
+                }
+            ]
+        }
+    ]
+}

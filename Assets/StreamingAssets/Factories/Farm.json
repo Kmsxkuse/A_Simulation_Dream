@@ -1,0 +1,98 @@
+{
+    "name": "Farm",
+    "costOfLiving": [],
+    "limitGoods": [
+        {
+            "name": "Food",
+            "quantity": 10
+        }
+    ],
+    "idealQuantity": [
+        {
+            "name": "Food",
+            "quantity": 0
+        },
+        {
+            "name": "Tools",
+            "quantity": 1
+        },
+        {
+            "name": "Wood",
+            "quantity": 3
+        },
+        {
+            "name": "Work",
+            "quantity": 3
+        }
+    ],
+    "startQuantity": [
+        {
+            "name": "Food",
+            "quantity": 1
+        },
+        {
+            "name": "Tools",
+            "quantity": 1
+        }
+    ],
+    "possibleDeltas": [
+        {
+            "consumes": [
+                {
+                    "name": "Wood",
+                    "quantity": 1,
+                    "possibility": 1.0
+                },
+                {
+                    "name": "Tools",
+                    "quantity": 1,
+                    "possibility": 0.10000000149011612
+                },
+                {
+                    "name": "Work",
+                    "quantity": 1,
+                    "possibility": 1.0
+                }
+            ],
+            "produces": [
+                {
+                    "name": "Food",
+                    "quantity": 6,
+                    "possibility": 1.0
+                }
+            ]
+        },
+        {
+            "consumes": [
+                {
+                    "name": "Wood",
+                    "quantity": 1,
+                    "possibility": 1.0
+                },
+                {
+                    "name": "Work",
+                    "quantity": 1,
+                    "possibility": 1.0
+                }
+            ],
+            "produces": [
+                {
+                    "name": "Food",
+                    "quantity": 3,
+                    "possibility": 1.0
+                }
+            ]
+        },
+        {
+            "requirements": [],
+            "consumes": [],
+            "produces": [
+                {
+                    "name": "Food",
+                    "quantity": 1,
+                    "possibility": 1.0
+                }
+            ]
+        }
+    ]
+}

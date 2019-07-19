@@ -1,0 +1,44 @@
+{
+    "name": "Peasant",
+    "costOfLiving": [
+        {
+            "name": "Food",
+            "quantity": 1
+        }
+    ],
+    "limitGoods": [
+        {
+            "name": "Work",
+            "quantity": 1
+        }
+    ],
+    "idealQuantity": [
+        {
+            "name": "Food",
+            "quantity": 3
+        },
+        {
+            "name": "Work",
+            "quantity": 0
+        }
+    ],
+    "startQuantity": [
+        {
+            "name": "Food",
+            "quantity": 1
+        }
+    ],
+    "possibleDeltas": [
+        {
+            "requirements": [],
+            "consumes": [],
+            "produces": [
+                {
+                    "name": "Work",
+                    "quantity": 1,
+                    "possibility": 1.0
+                }
+            ]
+        }
+    ]
+}

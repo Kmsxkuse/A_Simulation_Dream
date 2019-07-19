@@ -1,0 +1,67 @@
+{
+    "name": "Mine",
+    "costOfLiving": [
+        {
+            "name": "Food",
+            "quantity": 1
+        }
+    ],
+    "limitGoods": [
+        {
+            "name": "Ore",
+            "quantity": 4
+        }
+    ],
+    "idealQuantity": [
+        {
+            "name": "Food",
+            "quantity": 3
+        },
+        {
+            "name": "Tools",
+            "quantity": 1
+        },
+        {
+            "name": "Ore",
+            "quantity": 0
+        }
+    ],
+    "startQuantity": [
+        {
+            "name": "Food",
+            "quantity": 1
+        },
+        {
+            "name": "Tools",
+            "quantity": 1
+        }
+    ],
+    "possibleDeltas": [
+        {
+            "consumes": [
+                {
+                    "name": "Tools",
+                    "quantity": 1,
+                    "possibility": 0.10000000149011612
+                }
+            ],
+            "produces": [
+                {
+                    "name": "Ore",
+                    "quantity": 4,
+                    "possibility": 1.0
+                }
+            ]
+        },
+        {
+            "consumes": [],
+            "produces": [
+                {
+                    "name": "Ore",
+                    "quantity": 2,
+                    "possibility": 1.0
+                }
+            ]
+        }
+    ]
+}

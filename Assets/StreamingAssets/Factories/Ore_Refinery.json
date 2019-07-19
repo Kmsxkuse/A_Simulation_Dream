@@ -1,0 +1,82 @@
+{
+    "name": "Ore_Refinery",
+    "costOfLiving": [
+        {
+            "name": "Food",
+            "quantity": 1
+        }
+    ],
+    "limitGoods": [
+        {
+            "name": "Metal",
+            "quantity": 4
+        }
+    ],
+    "idealQuantity": [
+        {
+            "name": "Food",
+            "quantity": 3
+        },
+        {
+            "name": "Tools",
+            "quantity": 1
+        },
+        {
+            "name": "Ore",
+            "quantity": 5
+        },
+        {
+            "name": "Metal",
+            "quantity": 0
+        }
+    ],
+    "startQuantity": [
+        {
+            "name": "Food",
+            "quantity": 1
+        },
+        {
+            "name": "Tools",
+            "quantity": 1
+        }
+    ],
+    "possibleDeltas": [
+        {
+            "consumes": [
+                {
+                    "name": "Tools",
+                    "quantity": 1,
+                    "possibility": 0.10000000149011612
+                },
+                {
+                    "name": "Ore",
+                    "quantity": -4,
+                    "possibility": 1.0
+                }
+            ],
+            "produces": [
+                {
+                    "name": "Metal",
+                    "quantity": -1,
+                    "possibility": 1.0
+                }
+            ]
+        },
+        {
+            "consumes": [
+                {
+                    "name": "Ore",
+                    "quantity": -2,
+                    "possibility": 1.0
+                }
+            ],
+            "produces": [
+                {
+                    "name": "Metal",
+                    "quantity": -1,
+                    "possibility": 1.0
+                }
+            ]
+        }
+    ]
+}
