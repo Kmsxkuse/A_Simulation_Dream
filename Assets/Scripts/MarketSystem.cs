@@ -1,19 +1,175 @@
-﻿using Unity.Burst;
+﻿using System.Collections.Generic;
+using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
+using Random = Unity.Mathematics.Random;
 
 // ReSharper disable ForCanBeConvertedToForeach
 
 public class MarketSystem : JobComponentSystem
 {
+    private BufferFromEntity<CostOfLiving> _costOfLiving;
+    private NativeMultiHashMap<Entity, float> _deltaMoney;
+    private BufferFromEntity<DeltaValue> _deltaValues;
+
+    private EntityCommandBuffer _ecb;
+    private NativeQueue<float3> _forgottenGoodsData;
+
+    private int _frameCount;
+
+    private NativeArray<Entity> _goodEntities;
+    private NativeArray<Good> _goods;
+    private NativeArray<float3> _goodsData;
+    private BufferFromEntity<IdealQuantity> _idealQuantity;
+    private ComponentDataFromEntity<Inventory> _inventorySizes;
+    private BufferFromEntity<LimitGood> _limitGoods;
+
+    private NativeMultiHashMap<Entity, float3>
+        _observedGoodHistories, _revisionism; // x: good index. y: quantity. z: frame recorded
+
+    private BufferFromEntity<PossibleDelta> _possibleDeltas;
+    private NativeMultiHashMap<int, Offer> _tradeAsks, _tradeBids;
+
+    protected override JobHandle OnUpdate(JobHandle inputDependencies)
+    {
+        Debug.Break();
+
+        _frameCount = Time.frameCount;
+
+        var calculateGoods = new CleanStarting
+        {
+            revisionism = _revisionism,
+            forgotten = _forgottenGoodsData
+        }.Schedule(inputDependencies);
+
+        calculateGoods = new CalculateHistories
+        {
+            currentFrameCount = _frameCount,
+            forgotten = _forgottenGoodsData.ToConcurrent(),
+            goodsData = _goodsData,
+            history = _observedGoodHistories,
+            revisionist = _revisionism.ToConcurrent()
+        }.Schedule(this, calculateGoods);
+
+        calculateGoods = new AssignGoodData
+        {
+            goodsData = _goodsData,
+            goodEntities = _goodEntities,
+            goods = _goods,
+            ecb = _ecb.ToConcurrent()
+        }.Schedule(_goodEntities.Length, 1, calculateGoods);
+
+        var marketJobs = new ProcessAgentLogic
+        {
+            costOfLiving = _costOfLiving,
+            limitGoods = _limitGoods,
+            possibleDeltas = _possibleDeltas,
+            deltaValues = _deltaValues,
+            randomNumber = new Random((uint) UnityEngine.Random.Range(1, 100000)),
+            inventoryContents = GetBufferFromEntity<InvContent>()
+        }.Schedule(this, inputDependencies);
+
+        marketJobs = new GenerateOffers
+        {
+            idealQuantities = _idealQuantity,
+            inventoryContents = GetBufferFromEntity<InvContent>(true),
+            inventorySizes = _inventorySizes,
+            goods = _goods,
+            tradeAsks = _tradeAsks.ToConcurrent(),
+            tradeBids = _tradeBids.ToConcurrent()
+        }.Schedule(this, JobHandle.CombineDependencies(marketJobs, calculateGoods));
+
+        marketJobs = new ResolveOffers
+        {
+            tradeAsks = _tradeAsks,
+            tradeBids = _tradeBids,
+            currentFrame = _frameCount,
+            inventoryContents = GetBufferFromEntity<InvContent>(),
+            goodHistory = _revisionism.ToConcurrent(),
+            deltaMoney = _deltaMoney.ToConcurrent()
+        }.Schedule(_goods.Length, 1, marketJobs);
+
+        var completeChanges = new ProcessMoneyChanges
+        {
+            deltaMoney = _deltaMoney
+        }.Schedule(this, marketJobs);
+
+        completeChanges = new RewriteHistory
+        {
+            history = _observedGoodHistories.ToConcurrent(),
+            revisionism = _revisionism
+        }.Schedule(this, completeChanges);
+
+        marketJobs = new ResetMultiHashMaps
+        {
+            tradeAsks = _tradeAsks,
+            tradeBids = _tradeBids,
+            deltaMoney = _deltaMoney,
+            history = _observedGoodHistories
+        }.Schedule(JobHandle.CombineDependencies(marketJobs, completeChanges));
+
+        return marketJobs;
+    }
+
+    protected override void OnCreate()
+    {
+        _ecb = new EntityCommandBuffer(Allocator.Persistent);
+
+        _costOfLiving = GetBufferFromEntity<CostOfLiving>(true);
+        _limitGoods = GetBufferFromEntity<LimitGood>(true);
+        _possibleDeltas = GetBufferFromEntity<PossibleDelta>(true);
+        _deltaValues = GetBufferFromEntity<DeltaValue>(true);
+        _idealQuantity = GetBufferFromEntity<IdealQuantity>(true);
+        _inventorySizes = GetComponentDataFromEntity<Inventory>(true);
+
+        _observedGoodHistories = new NativeMultiHashMap<Entity, float3>(1000, Allocator.Persistent);
+        _revisionism = new NativeMultiHashMap<Entity, float3>(_observedGoodHistories.Capacity, Allocator.Persistent);
+        _tradeAsks = new NativeMultiHashMap<int, Offer>(_observedGoodHistories.Capacity, Allocator.Persistent);
+        _tradeBids = new NativeMultiHashMap<int, Offer>(_observedGoodHistories.Capacity, Allocator.Persistent);
+        _deltaMoney = new NativeMultiHashMap<Entity, float>(_observedGoodHistories.Capacity, Allocator.Persistent);
+
+        _goodEntities = GetEntityQuery(typeof(Good)).ToEntityArray(Allocator.Persistent);
+        _goods = new NativeArray<Good>(_goodEntities.Length, Allocator.Persistent);
+        for (var index = 0; index < _goodEntities.Length; index++)
+        {
+            _goods[index] = EntityManager.GetComponentData<Good>(_goodEntities[index]);
+
+            using (var agents = GetEntityQuery(typeof(Agent)).ToEntityArray(Allocator.TempJob))
+            {
+                foreach (var agentEntity in agents)
+                {
+                    // Pushing 2 fake trades to establish observed range
+                    _observedGoodHistories.Add(agentEntity, new float3(index, _goods[index].Mean, 0));
+                    _observedGoodHistories.Add(agentEntity, new float3(index, _goods[index].Mean * 3, 0));
+                }
+            }
+        }
+
+        _goodsData = new NativeArray<float3>(_goodEntities.Length, Allocator.Persistent);
+        _forgottenGoodsData = new NativeQueue<float3>(Allocator.Persistent);
+    }
+
+    protected override void OnStopRunning()
+    {
+        _ecb.Dispose();
+        _goods.Dispose();
+        _goodEntities.Dispose();
+        _goodsData.Dispose();
+        _observedGoodHistories.Dispose();
+        _forgottenGoodsData.Dispose();
+        _tradeAsks.Dispose();
+        _tradeBids.Dispose();
+        _deltaMoney.Dispose();
+    }
+
     private struct Offer
     {
-        public Entity Source;
+        public readonly Entity Source;
         public int Units;
-        public float Cost;
+        public readonly float Cost;
 
         public Offer(Entity source, int units, float cost)
         {
@@ -23,26 +179,6 @@ public class MarketSystem : JobComponentSystem
         }
     }
 
-    private int _frameCount;
-
-    private NativeMultiHashMap<int, Offer> _tradeAsks;
-    private NativeMultiHashMap<int, Offer> _tradeBids;
-    private NativeMultiHashMap<int, float2> _goodHistories;
-    
-    private BufferFromEntity<CostOfLiving> _costOfLiving;
-    private BufferFromEntity<LimitGood> _limitGoods;
-    private BufferFromEntity<PossibleDelta> _possibleDeltas;
-    private BufferFromEntity<DeltaValue> _deltaValues;
-    private BufferFromEntity<IdealQuantity> _idealQuantity;
-    private ComponentDataFromEntity<Inventory> _inventorySizes;
-
-    private NativeArray<Entity> _goodEntities;
-    private NativeArray<Good> _goods;
-    private NativeArray<float3> _goodsData;
-    private NativeQueue<float3> _forgottenGoodsData;
-
-    private EntityCommandBuffer _ecb;
-
     [BurstCompile]
     private struct ProcessAgentLogic : IJobForEachWithEntity<Agent>
     {
@@ -51,15 +187,15 @@ public class MarketSystem : JobComponentSystem
         [ReadOnly] public BufferFromEntity<PossibleDelta> possibleDeltas;
         [ReadOnly] public BufferFromEntity<DeltaValue> deltaValues;
 
-        [ReadOnly] public Unity.Mathematics.Random randomNumber;
+        [ReadOnly] public Random randomNumber;
 
         [NativeDisableParallelForRestriction] public BufferFromEntity<InvContent> inventoryContents;
-        
+
         public void Execute([ReadOnly] Entity entity, [ReadOnly] int index, ref Agent agent)
         {
             var targetLivingCosts = costOfLiving[agent.Logic].AsNativeArray();
             var targetInventory = inventoryContents[entity].AsNativeArray();
-            
+
             // Checking for minimum living cost expenditure. Typically just 1 unit of food.
             for (var i = 0; i < targetLivingCosts.Length; i++)
             {
@@ -72,7 +208,7 @@ public class MarketSystem : JobComponentSystem
                     agent.Starving = true;
                     placeholder.Quantity = 0;
                 }
-                
+
                 targetInventory[currentLivingCost.Good] = placeholder;
             }
 
@@ -81,7 +217,7 @@ public class MarketSystem : JobComponentSystem
                 return;
 
             var targetLimitGoods = limitGoods[agent.Logic].AsNativeArray();
-            
+
             // Determining if Agent has too many produced goods.
             // ReSharper disable once LoopCanBeConvertedToQuery
             for (var i = 0; i < targetLimitGoods.Length; i++)
@@ -93,7 +229,7 @@ public class MarketSystem : JobComponentSystem
 
             var targetPossibleDeltas = possibleDeltas[agent.Logic].AsNativeArray();
             var targetDeltaValues = deltaValues[agent.Logic].AsNativeArray();
-            
+
             var selectedDelta = new int3(-1);
 
             // Calculating proper delta/production line given current inventory
@@ -101,12 +237,12 @@ public class MarketSystem : JobComponentSystem
             {
                 var range = targetPossibleDeltas[i].Deltas;
                 var checker = true;
-                
+
                 for (var j = range.x; j < range.y; j++)
                     checker = checker &&
-                              targetInventory[targetDeltaValues[j].Good].Quantity 
+                              targetInventory[targetDeltaValues[j].Good].Quantity
                               >= (targetDeltaValues[j].Quantity > 0 ? targetDeltaValues[j].Quantity : 1);
-                
+
                 if (!checker)
                     continue;
 
@@ -116,7 +252,7 @@ public class MarketSystem : JobComponentSystem
 
             if (selectedDelta.x < 0)
                 return;
-            
+
             var variableConsumption = 1f;
 
             // First pass of consumption, or input, of goods to find lowest variable consumption.
@@ -130,20 +266,20 @@ public class MarketSystem : JobComponentSystem
                     continue;
 
                 // Consumption is determined by lowest ratio of current inventory to maximum consumed.
-                var percentConsumed = Mathf.Clamp01((float) targetInventory[currentDeltaValue.Good].Quantity 
+                var percentConsumed = Mathf.Clamp01((float) targetInventory[currentDeltaValue.Good].Quantity
                                                     / Mathf.Abs(currentDeltaValue.Quantity));
 
                 variableConsumption = percentConsumed < variableConsumption
                     ? percentConsumed
                     : variableConsumption;
             }
-            
+
             // Second pass of consumption
             for (var consume = selectedDelta.x; consume < selectedDelta.y; consume++)
             {
                 var currentDeltaValue = targetDeltaValues[consume];
                 var placeholder = targetInventory[currentDeltaValue.Good];
-                
+
                 // Must roll lower than probability to consume good
                 if (randomNumber.NextFloat(0, 1) > currentDeltaValue.Possibility)
                     continue;
@@ -157,7 +293,7 @@ public class MarketSystem : JobComponentSystem
                 var currentDeltaValue = targetDeltaValues[produce];
                 var placeholder = targetInventory[currentDeltaValue.Good];
                 // Quantities less than zero for production multiplies consumption by value.
-                placeholder.Quantity += currentDeltaValue.Quantity > 0 
+                placeholder.Quantity += currentDeltaValue.Quantity > 0
                     ? currentDeltaValue.Quantity
                     : Mathf.FloorToInt(Mathf.Abs(currentDeltaValue.Quantity) * variableConsumption);
                 targetInventory[currentDeltaValue.Good] = placeholder;
@@ -165,52 +301,47 @@ public class MarketSystem : JobComponentSystem
         }
     }
 
-    //[BurstCompile]
-    private struct CalculateHistories : IJob
+    [BurstCompile]
+    private struct CalculateHistories : IJobForEachWithEntity<Inventory>
     {
-        [ReadOnly] public int goodsCount, currentFrameCount;
-        
-        [WriteOnly] public NativeQueue<float3> forgotten;
+        [ReadOnly] public int currentFrameCount;
+
+        [WriteOnly] public NativeQueue<float3>.Concurrent forgotten;
         [WriteOnly] public NativeArray<float3> goodsData;
-        
-        public NativeMultiHashMap<int, float2> history;
-        
-        public void Execute()
+
+        [ReadOnly] public NativeMultiHashMap<Entity, float3> history;
+        [WriteOnly] public NativeMultiHashMap<Entity, float3>.Concurrent revisionist;
+
+        public void Execute([ReadOnly] Entity entity, [ReadOnly] int jobIndex, ref Inventory throwaway)
         {
-            for (var index = 0; index < goodsCount; index++)
+            if (!history.TryGetFirstValue(entity, out var meanData, out var iterator))
+                return;
+
+            var average = 0f;
+            var transactions = 0;
+            var minimum = Mathf.Infinity;
+            var maximum = Mathf.NegativeInfinity;
+
+            do
             {
-                var average = 0f;
-                var transactions = 0;
-                var minimum = Mathf.Infinity;
-                var maximum = Mathf.NegativeInfinity;
-                
-                if (!history.TryGetFirstValue(index, out var meanData, out var iterator))
-                    continue;
-
-                do
+                if (currentFrameCount - meanData.z > 10) // how many turns to look back
                 {
-                    if (currentFrameCount - meanData.y > 10) // how many turns to look back
-                    {
-                        forgotten.Enqueue(new float3(index, meanData));
-                        // This is why I cant parallel this.
-                        history.Remove(iterator);
-                        continue;
-                    }
-                    
-                    average += (meanData.x - average) / ++transactions;
+                    forgotten.Enqueue(meanData);
+                    continue;
+                }
 
-                    if (minimum > meanData.x)
-                        minimum = meanData.x;
-                    if (maximum < meanData.x)
-                        maximum = meanData.x;
-                    
-                } while (history.TryGetNextValue(out meanData, ref iterator));
-                
-                goodsData[index] = new float3(average, minimum, maximum);
-            }
+                average += (meanData.y - average) / ++transactions;
+
+                minimum = Mathf.Min(minimum, meanData.y);
+                maximum = Mathf.Max(maximum, meanData.y);
+
+                revisionist.Add(entity, meanData);
+            } while (history.TryGetNextValue(out meanData, ref iterator));
+
+            goodsData[Mathf.RoundToInt(meanData.x)] = new float3(average, minimum, maximum);
         }
     }
-    
+
     // ECB kills Burst.
     private struct AssignGoodData : IJobParallelFor
     {
@@ -218,9 +349,9 @@ public class MarketSystem : JobComponentSystem
         [ReadOnly] public NativeArray<Entity> goodEntities;
 
         [WriteOnly] public EntityCommandBuffer.Concurrent ecb;
-        
+
         [NativeDisableParallelForRestriction] public NativeArray<Good> goods;
-        
+
         public void Execute(int index)
         {
             var placeholder = goods[index];
@@ -228,7 +359,7 @@ public class MarketSystem : JobComponentSystem
             placeholder.Minimum = goodsData[index].y;
             placeholder.Maximum = goodsData[index].z;
             goods[index] = placeholder;
-            
+
             ecb.SetComponent(index, goodEntities[index], placeholder);
         }
     }
@@ -241,9 +372,8 @@ public class MarketSystem : JobComponentSystem
         [ReadOnly] public ComponentDataFromEntity<Inventory> inventorySizes;
         [ReadOnly] public NativeArray<Good> goods;
 
-        [WriteOnly] public NativeMultiHashMap<int, Offer>.Concurrent tradeAsks;
-        [WriteOnly] public NativeMultiHashMap<int, Offer>.Concurrent tradeBids;
-        
+        [WriteOnly] public NativeMultiHashMap<int, Offer>.Concurrent tradeAsks, tradeBids;
+
         public void Execute([ReadOnly] Entity entity, [ReadOnly] int index, [ReadOnly] ref Agent agent)
         {
             // Determining if surplus or shortage
@@ -256,7 +386,7 @@ public class MarketSystem : JobComponentSystem
                 if (targetInvContent.Quantity > targetIdeals[good])
                 {
                     // Surplus
-                    var reasonablePrice = targetInvContent.OriginalCost * 1.02f;
+                    var reasonablePrice = targetInvContent.RecordedPrice * 1.02f;
                     //agent.NumProduct = targetGood.Quantity; // No clue what this does
                     // Intentional placing entire inventory out to market.
                     tradeAsks.Add(good, new Offer(entity, targetInvContent.Quantity, reasonablePrice));
@@ -274,96 +404,156 @@ public class MarketSystem : JobComponentSystem
                         ? shortage
                         : Mathf.FloorToInt((float) invSpaceLeft / goodSize);
 
-                    var bidPrice = 0; // Why not get it for free?
+                    const int bidPrice = 0; // Why not get it for free?
+
+                    // Higher if closer to minimum;
+                    var preference = 1 - Mathf.Clamp01((goods[good].Mean - goods[good].Minimum) /
+                                                       (goods[good].Maximum - goods[good].Minimum));
+
+                    var purchaseQuantity = Mathf.Clamp(Mathf.RoundToInt(preference * shortage),
+                        1, limit);
+
+                    tradeBids.Add(good, new Offer(entity, purchaseQuantity, bidPrice));
                 }
             }
         }
     }
 
-    protected override JobHandle OnUpdate(JobHandle inputDependencies)
+    [BurstCompile]
+    private struct ResolveOffers : IJobParallelFor
     {
-        Debug.Break();
-        
-        _frameCount = Time.frameCount;
-        _forgottenGoodsData.Clear();
-        
-        var calculateGoods = new CalculateHistories
-        {
-            currentFrameCount = _frameCount,
-            goodsCount = _goodEntities.Length,
-            forgotten = _forgottenGoodsData,
-            goodsData = _goodsData,
-            history = _goodHistories
-        }.Schedule(inputDependencies);
-        
-        calculateGoods = new AssignGoodData
-        {
-            goodsData = _goodsData,
-            goodEntities = _goodEntities,
-            goods = _goods,
-            ecb = _ecb.ToConcurrent()
-        }.Schedule(_goodEntities.Length, 1, calculateGoods);
-        
-        var marketJobs = new ProcessAgentLogic
-        {
-            costOfLiving = _costOfLiving,
-            limitGoods = _limitGoods,
-            possibleDeltas = _possibleDeltas,
-            deltaValues = _deltaValues,
-            randomNumber = new Unity.Mathematics.Random((uint) UnityEngine.Random.Range(1, 100000)),
-            inventoryContents = GetBufferFromEntity<InvContent>()
-        }.Schedule(this, inputDependencies);
-        
-        marketJobs = new GenerateOffers
-        {
-            idealQuantities = _idealQuantity,
-            inventoryContents = GetBufferFromEntity<InvContent>(true),
-            inventorySizes = _inventorySizes,
-            goods = _goods,
-            tradeAsks = _tradeAsks.ToConcurrent(),
-            tradeBids = _tradeBids.ToConcurrent()
-        }.Schedule(this, JobHandle.CombineDependencies(marketJobs, calculateGoods));
-        
-        return marketJobs;
-    }
+        [ReadOnly] public NativeMultiHashMap<int, Offer> tradeAsks, tradeBids;
+        [ReadOnly] public int currentFrame;
 
-    protected override void OnCreate()
-    {
-        _ecb = new EntityCommandBuffer(Allocator.Persistent);
-        
-        _costOfLiving = GetBufferFromEntity<CostOfLiving>(true);
-        _limitGoods = GetBufferFromEntity<LimitGood>(true);
-        _possibleDeltas = GetBufferFromEntity<PossibleDelta>(true);
-        _deltaValues = GetBufferFromEntity<DeltaValue>(true);
-        _idealQuantity = GetBufferFromEntity<IdealQuantity>(true);
-        _inventorySizes = GetComponentDataFromEntity<Inventory>(true);
-        
-        _goodHistories = new NativeMultiHashMap<int, float2>(1000, Allocator.Persistent);
+        [WriteOnly] public NativeMultiHashMap<Entity, float3>.Concurrent goodHistory;
+        [WriteOnly] public NativeMultiHashMap<Entity, float>.Concurrent deltaMoney;
 
-        _goodEntities = GetEntityQuery(typeof(Good)).ToEntityArray(Allocator.Persistent);
-        _goods = new NativeArray<Good>(_goodEntities.Length, Allocator.Persistent);
-        for (var index = 0; index < _goodEntities.Length; index++)
+        [NativeDisableParallelForRestriction] public BufferFromEntity<InvContent> inventoryContents;
+
+        public void Execute(int index)
         {
-            _goods[index] = EntityManager.GetComponentData<Good>(_goodEntities[index]);
-            _goodHistories.Add(index, new float2(_goods[index].Mean, 0)); // Push 2 fake trades to generate starting range.
-            _goodHistories.Add(index, new float2(_goods[index].Mean * 3, 0));
+            var currentAsks = new NativeList<Offer>(Allocator.Temp);
+            var currentBids = new NativeList<Offer>(Allocator.Temp);
+
+            var numAsks = 0;
+            var numBids = 0;
+
+            if (!tradeAsks.TryGetFirstValue(index, out var currentOffer, out var iterator))
+                return;
+
+            do
+            {
+                currentAsks.Add(currentOffer);
+                numAsks += currentOffer.Units;
+            } while (tradeAsks.TryGetNextValue(out currentOffer, ref iterator));
+
+            if (!tradeBids.TryGetFirstValue(index, out currentOffer, out iterator))
+                return;
+
+            do
+            {
+                currentBids.Add(currentOffer);
+                numBids += currentOffer.Units;
+            } while (tradeBids.TryGetNextValue(out currentOffer, ref iterator));
+
+            currentAsks.AsArray().Sort(Comparer<Offer>.Create(
+                (x, y) => x.Cost > y.Cost ? -1 : x.Cost < y.Cost ? 1 : 0));
+
+            while (currentBids.Length > 0 && currentAsks.Length > 0)
+            {
+                var buyer = currentBids[0];
+                var seller = currentAsks[0];
+
+                var quantityTraded = Mathf.Min(buyer.Units, seller.Units);
+                var clearingPrice = seller.Cost;
+
+                if (quantityTraded > 0)
+                {
+                    // Transferring goods
+                    seller.Units -= quantityTraded;
+                    buyer.Units -= quantityTraded;
+
+                    var targetInv = inventoryContents[seller.Source].AsNativeArray();
+                    var placeholder = targetInv[index];
+                    placeholder.Quantity =
+                        Mathf.Clamp(placeholder.Quantity - quantityTraded, 0, placeholder.Quantity);
+                    // No change to recorded price by seller.
+                    targetInv[index] = placeholder;
+
+                    targetInv = inventoryContents[buyer.Source].AsNativeArray();
+                    placeholder = targetInv[index];
+                    placeholder.RecordedPrice = (placeholder.Quantity * placeholder.RecordedPrice + quantityTraded
+                                                 * clearingPrice) / (placeholder.Quantity + quantityTraded);
+                    placeholder.Quantity += quantityTraded;
+
+                    deltaMoney.Add(seller.Source, clearingPrice * quantityTraded);
+                    deltaMoney.Add(buyer.Source, -clearingPrice * quantityTraded);
+                }
+            }
         }
-        _goodsData = new NativeArray<float3>(_goodEntities.Length, Allocator.Persistent);
-        _forgottenGoodsData = new NativeQueue<float3>(Allocator.Persistent);
-        
-        _tradeAsks = new NativeMultiHashMap<int, Offer>(1000, Allocator.Persistent);
-        _tradeBids = new NativeMultiHashMap<int, Offer>(1000, Allocator.Persistent);
     }
 
-    protected override void OnDestroy()
+    [BurstCompile]
+    private struct ProcessMoneyChanges : IJobForEachWithEntity<Wallet>
     {
-        _ecb.Dispose();
-        _tradeAsks.Dispose();
-        _tradeBids.Dispose();
-        _goods.Dispose();
-        _goodEntities.Dispose();
-        _goodsData.Dispose();
-        _goodHistories.Dispose();
-        _forgottenGoodsData.Dispose();
+        [ReadOnly] public NativeMultiHashMap<Entity, float> deltaMoney;
+
+        public void Execute([ReadOnly] Entity entity, [ReadOnly] int index, ref Wallet wallet)
+        {
+            if (!deltaMoney.TryGetFirstValue(entity, out var transaction, out var iterator))
+                return;
+
+            do
+            {
+                wallet.Money += transaction;
+            } while (deltaMoney.TryGetNextValue(out transaction, ref iterator));
+        }
+    }
+
+    [BurstCompile]
+    private struct ResetMultiHashMaps : IJob
+    {
+        public NativeMultiHashMap<int, Offer> tradeAsks, tradeBids;
+        public NativeMultiHashMap<Entity, float> deltaMoney;
+        public NativeMultiHashMap<Entity, float3> history;
+
+        public void Execute()
+        {
+            tradeAsks.Clear();
+            tradeBids.Clear();
+            deltaMoney.Clear();
+            history.Clear();
+        }
+    }
+
+    [BurstCompile]
+    private struct RewriteHistory : IJobForEachWithEntity<Agent>
+    {
+        [ReadOnly] public NativeMultiHashMap<Entity, float3> revisionism;
+        [WriteOnly] public NativeMultiHashMap<Entity, float3>.Concurrent history;
+
+        public void Execute(Entity entity, int index, ref Agent throwaway)
+        {
+            if (!revisionism.TryGetFirstValue(entity, out var transaction, out var iterator))
+                return;
+
+            do
+            {
+                history.Add(entity, transaction);
+            } while (revisionism.TryGetNextValue(out transaction, ref iterator));
+        }
+    }
+
+    [BurstCompile]
+    private struct CleanStarting : IJob
+    {
+        public NativeMultiHashMap<Entity, float3> revisionism;
+        public NativeQueue<float3> forgotten;
+
+        public void Execute()
+        {
+            forgotten.Clear();
+            revisionism.Clear();
+        }
     }
 }

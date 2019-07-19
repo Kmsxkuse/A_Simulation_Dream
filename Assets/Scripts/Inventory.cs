@@ -17,15 +17,17 @@ public struct Inventory : IComponentData
 public struct InvContent : IBufferElementData
 {
     // Index in Dynamic Buffer determines type.
-    public readonly float OriginalCost;
+    public float RecordedPrice;
     public int Quantity;
 
-    public InvContent(int quantity, float originalCost = 0)
+    public InvContent(int quantity, float recordedPrice = 0)
     {
-        OriginalCost = originalCost;
+        RecordedPrice = recordedPrice;
         Quantity = quantity;
     }
 
-    public override string ToString() =>
-        $"Quantity: {Quantity}. Original Cost: {OriginalCost}.";
+    public override string ToString()
+    {
+        return $"Quantity: {Quantity}. Original Cost: {RecordedPrice}.";
+    }
 }
