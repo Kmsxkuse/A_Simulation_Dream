@@ -8,17 +8,13 @@ public struct Good : IComponentData, IEquatable<Good>
     public readonly int Index;
     public readonly int SpaceOccupied;
 
-    public float Mean;
-    public float Minimum;
-    public float Maximum;
+    public readonly float InitialCost;
 
     public Good(int index, JsonGood jsonGood)
     {
         Index = index;
         SpaceOccupied = jsonGood.size;
-        Mean = jsonGood.initialCost;
-        Minimum = 0;
-        Maximum = Mean;
+        InitialCost = jsonGood.initialCost;
     }
 
     public bool Equals(Good other)
@@ -54,6 +50,8 @@ public struct JsonGood
     public int size;
     public float initialCost;
 
-    public static JsonGood CreateFromJson(string path) => 
-        JsonUtility.FromJson<JsonGood>(File.ReadAllText(path));
+    public static JsonGood CreateFromJson(string path)
+    {
+        return JsonUtility.FromJson<JsonGood>(File.ReadAllText(path));
+    }
 }

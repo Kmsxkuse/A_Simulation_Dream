@@ -14,7 +14,7 @@
         },
         {
             "name": "Tools",
-            "quantity": 1
+            "quantity": 2
         },
         {
             "name": "Wood",
@@ -22,7 +22,7 @@
         },
         {
             "name": "Work",
-            "quantity": 3
+            "quantity": 4
         }
     ],
     "startQuantity": [
@@ -33,6 +33,10 @@
         {
             "name": "Tools",
             "quantity": 1
+        },
+        {
+            "name": "Work",
+            "quantity": 1
         }
     ],
     "possibleDeltas": [
@@ -41,16 +45,47 @@
                 {
                     "name": "Wood",
                     "quantity": 1,
-                    "possibility": 1.0
+                    "possibility": 0.7
                 },
                 {
                     "name": "Tools",
                     "quantity": 1,
-                    "possibility": 0.10000000149011612
+                    "possibility": 0.8
+                },
+                {
+                    "name": "Work",
+                    "quantity": 2,
+                    "possibility": 1.0
                 },
                 {
                     "name": "Work",
                     "quantity": 1,
+                    "possibility": 0.7
+                }
+            ],
+            "produces": [
+                {
+                    "name": "Food",
+                    "quantity": 10,
+                    "possibility": 1.0
+                }
+            ]
+        },
+        {
+            "consumes": [
+                {
+                    "name": "Wood",
+                    "quantity": 1,
+                    "possibility": 0.7
+                },
+                {
+                    "name": "Tools",
+                    "quantity": 1,
+                    "possibility": 0.1
+                },
+                {
+                    "name": "Work",
+                    "quantity": 3,
                     "possibility": 1.0
                 }
             ],
@@ -65,31 +100,30 @@
         {
             "consumes": [
                 {
-                    "name": "Wood",
+                    "name": "Work",
                     "quantity": 1,
-                    "possibility": 1.0
+                    "possibility": 0.7
                 },
                 {
                     "name": "Work",
                     "quantity": 1,
-                    "possibility": 1.0
+                    "possibility": 0.2
                 }
             ],
             "produces": [
                 {
                     "name": "Food",
-                    "quantity": 3,
+                    "quantity": 4,
                     "possibility": 1.0
                 }
             ]
         },
         {
-            "requirements": [],
             "consumes": [],
             "produces": [
                 {
                     "name": "Food",
-                    "quantity": 1,
+                    "quantity": 2,
                     "possibility": 1.0
                 }
             ]

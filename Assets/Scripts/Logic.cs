@@ -19,7 +19,7 @@ public struct Logic : IComponentData
 public struct CostOfLiving : IBufferElementData
 {
     public readonly int Good;
-    public int Quantity;
+    public readonly int Quantity;
 
     public CostOfLiving(int good, int quantity)
     {
@@ -32,7 +32,7 @@ public struct CostOfLiving : IBufferElementData
 public struct LimitGood : IBufferElementData
 {
     public readonly int Good;
-    public int Quantity;
+    public readonly int Quantity;
 
     public LimitGood(int good, int quantity)
     {
@@ -50,9 +50,16 @@ public struct IdealQuantity : IBufferElementData
     {
         _quantity = quantity;
     }
-    
-    public static implicit operator IdealQuantity(int i) => new IdealQuantity(i);
-    public static implicit operator int(IdealQuantity iq) => iq._quantity;
+
+    public static implicit operator IdealQuantity(int i)
+    {
+        return new IdealQuantity(i);
+    }
+
+    public static implicit operator int(IdealQuantity iq)
+    {
+        return iq._quantity;
+    }
 }
 
 [InternalBufferCapacity(0)]
@@ -64,8 +71,11 @@ public struct PossibleDelta : IBufferElementData
     {
         Deltas = deltas;
     }
-    
-    public static implicit operator PossibleDelta(int3 i) => new PossibleDelta(i);
+
+    public static implicit operator PossibleDelta(int3 i)
+    {
+        return new PossibleDelta(i);
+    }
 }
 
 [InternalBufferCapacity(0)]
@@ -96,10 +106,14 @@ public struct JsonLogic
     public List<JsonLValues> limitGoods; // if agent has more than or equal these goods in inventory, stop working.
     public List<JsonLValues> idealQuantity; // agent will buy or sell to these values
     public List<JsonLValues> startQuantity; // quantity of goods in inventory at start
-    public List<JsonDeltas> possibleDeltas; // all possible input and outputs in queue. First valid requirement gets produced.
 
-    public static JsonLogic CreateFromJson(string path) => 
-        JsonUtility.FromJson<JsonLogic>(File.ReadAllText(path));
+    public List<JsonDeltas>
+        possibleDeltas; // all possible input and outputs in queue. First valid requirement gets produced.
+
+    public static JsonLogic CreateFromJson(string path)
+    {
+        return JsonUtility.FromJson<JsonLogic>(File.ReadAllText(path));
+    }
 }
 
 [Serializable]
