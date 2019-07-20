@@ -12,8 +12,9 @@ using Random = Unity.Mathematics.Random;
 
 public class MarketSystem : JobComponentSystem
 {
+    private NativeArray<int> _askHistory, _bidHistory, _tradeHistory;
     private BufferFromEntity<CostOfLiving> _costOfLiving;
-    private NativeMultiHashMap<Entity, float> _deltaMoney;
+    private NativeMultiHashMap<Entity, float> _deltaMoney, _profitsByLogic;
     private BufferFromEntity<DeltaValue> _deltaValues;
 
     private int _frameCount, _goodsCount;
@@ -25,6 +26,7 @@ public class MarketSystem : JobComponentSystem
         _observedGoodHistories, _revisionism; // x: good index. y: cost. z: frame recorded
 
     private BufferFromEntity<PossibleDelta> _possibleDeltas;
+    private NativeArray<float> _priceHistory, _profitsHistory;
     private NativeMultiHashMap<int, Offer> _tradeAsks, _tradeBids;
 
     private EntityCommandBuffer _walletEcb;
@@ -84,7 +86,12 @@ public class MarketSystem : JobComponentSystem
             inventoryContents = targetInvContent,
             rng = currentRng,
             goodHistory = _revisionism.ToConcurrent(),
-            deltaMoney = _deltaMoney.ToConcurrent()
+            deltaMoney = _deltaMoney.ToConcurrent(),
+
+            AskHistory = _askHistory,
+            BidHistory = _bidHistory,
+            TradeHistory = _tradeHistory,
+            PriceHistory = _priceHistory
         }.Schedule(_goodsCount, 1, marketJobs);
 
         var completeChanges = new RewriteHistory
@@ -96,7 +103,15 @@ public class MarketSystem : JobComponentSystem
         marketJobs = new ProcessMoneyChanges
         {
             deltaMoney = _deltaMoney,
-            ecb = _walletEcb.ToConcurrent()
+            ecb = _walletEcb.ToConcurrent(),
+            newAgent = EntityManager.CreateArchetype(typeof(Agent), typeof(Wallet)),
+            profitsByLogic = _profitsByLogic.ToConcurrent()
+        }.Schedule(this, marketJobs);
+
+        marketJobs = new CollapseProfitsByLogic
+        {
+            profitsByLogic = _profitsByLogic,
+            profitHistory = _profitsHistory
         }.Schedule(this, marketJobs);
 
         marketJobs = new ResetMultiHashMaps
@@ -104,7 +119,8 @@ public class MarketSystem : JobComponentSystem
             tradeAsks = _tradeAsks,
             tradeBids = _tradeBids,
             deltaMoney = _deltaMoney,
-            revisionism = _revisionism
+            revisionism = _revisionism,
+            profitsByLogic = _profitsByLogic
         }.Schedule(JobHandle.CombineDependencies(marketJobs, completeChanges));
 
         return marketJobs;
@@ -125,8 +141,21 @@ public class MarketSystem : JobComponentSystem
         _tradeAsks = new NativeMultiHashMap<int, Offer>(_observedGoodHistories.Capacity / 4, Allocator.Persistent);
         _tradeBids = new NativeMultiHashMap<int, Offer>(_observedGoodHistories.Capacity / 4, Allocator.Persistent);
         _deltaMoney = new NativeMultiHashMap<Entity, float>(_observedGoodHistories.Capacity / 4, Allocator.Persistent);
+        _profitsByLogic =
+            new NativeMultiHashMap<Entity, float>(_observedGoodHistories.Capacity / 4, Allocator.Persistent);
 
         _goodsCount = History.GoodsCount;
+
+        _askHistory = new NativeArray<int>(_goodsCount, Allocator.Persistent);
+        _bidHistory = new NativeArray<int>(_goodsCount, Allocator.Persistent);
+        _tradeHistory = new NativeArray<int>(_goodsCount, Allocator.Persistent);
+        _priceHistory = new NativeArray<float>(_goodsCount, Allocator.Persistent);
+
+        using (var logicEntities = EntityManager.CreateEntityQuery(typeof(Logic))
+            .ToEntityArray(Allocator.TempJob))
+        {
+            _profitsHistory = new NativeArray<float>(logicEntities.Length, Allocator.Persistent);
+        }
     }
 
     protected override void OnStopRunning()
@@ -136,7 +165,14 @@ public class MarketSystem : JobComponentSystem
         _tradeAsks.Dispose();
         _tradeBids.Dispose();
         _deltaMoney.Dispose();
+        _profitsByLogic.Dispose();
         _revisionism.Dispose();
+
+        _askHistory.Dispose();
+        _bidHistory.Dispose();
+        _tradeHistory.Dispose();
+        _priceHistory.Dispose();
+        _profitsHistory.Dispose();
     }
 
     private struct Offer
@@ -355,7 +391,7 @@ public class MarketSystem : JobComponentSystem
         }
     }
 
-    //[BurstCompile]
+    [BurstCompile]
     private struct ResolveOffers : IJobParallelFor
     {
         [ReadOnly] public NativeMultiHashMap<int, Offer> tradeAsks, tradeBids;
@@ -365,6 +401,9 @@ public class MarketSystem : JobComponentSystem
         [WriteOnly] public NativeMultiHashMap<Entity, float3>.Concurrent goodHistory;
         [WriteOnly] public NativeMultiHashMap<Entity, float>.Concurrent deltaMoney;
 
+        [WriteOnly] public NativeArray<int> AskHistory, BidHistory, TradeHistory;
+        [WriteOnly] public NativeArray<float> PriceHistory;
+
         [NativeDisableParallelForRestriction] public BufferFromEntity<InvContent> inventoryContents;
 
         public void Execute(int index)
@@ -372,40 +411,45 @@ public class MarketSystem : JobComponentSystem
             var currentAsks = new NativeList<Offer>(Allocator.Temp);
             var currentBids = new NativeList<Offer>(Allocator.Temp);
 
-            //var numAsks = 0;
-            //var numBids = 0;
+            var numAsks = 0;
+            var numBids = 0;
 
-            if (!tradeAsks.TryGetFirstValue(index, out var currentOffer, out var iterator))
-                return;
-
-            do
+            if (tradeAsks.TryGetFirstValue(index, out var currentOffer, out var iterator))
             {
-                currentAsks.Add(currentOffer);
-                //numAsks += currentOffer.Units;
-            } while (tradeAsks.TryGetNextValue(out currentOffer, ref iterator));
+                do
+                {
+                    currentAsks.Add(currentOffer);
+                    numAsks += currentOffer.Units;
+                } while (tradeAsks.TryGetNextValue(out currentOffer, ref iterator));
 
-            if (!tradeBids.TryGetFirstValue(index, out currentOffer, out iterator))
-                return;
-
-            do
-            {
-                currentBids.Add(currentOffer);
-                //numBids += currentOffer.Units;
-            } while (tradeBids.TryGetNextValue(out currentOffer, ref iterator));
-
-            // Descending order (3, 2, 1). Normally left.CompareTo(right) for ascending order (1, 2, 3)
-            currentAsks.AsArray().Sort(Comparer<Offer>.Create(
-                (left, right) => right.Cost.CompareTo(left.Cost)));
-
-            // Randomizing bids
-            var n = currentBids.Length;
-            while (n-- > 1)
-            {
-                var k = rng.NextInt(n + 1);
-                var placeholder = currentBids[k];
-                currentBids[k] = currentBids[n];
-                currentBids[n] = placeholder;
+                // Descending order (3, 2, 1). Normally left.CompareTo(right) for ascending order (1, 2, 3)
+                currentAsks.AsArray().Sort(Comparer<Offer>.Create(
+                    (left, right) => right.Cost.CompareTo(left.Cost)));
             }
+
+            if (tradeBids.TryGetFirstValue(index, out currentOffer, out iterator))
+            {
+                do
+                {
+                    currentBids.Add(currentOffer);
+                    numBids += currentOffer.Units;
+                } while (tradeBids.TryGetNextValue(out currentOffer, ref iterator));
+
+                // Randomizing bids
+                var n = currentBids.Length;
+                while (n-- > 1)
+                {
+                    var k = rng.NextInt(n + 1);
+                    var placeholder = currentBids[k];
+                    currentBids[k] = currentBids[n];
+                    currentBids[n] = placeholder;
+                }
+            }
+
+            AskHistory[index] = numAsks;
+            BidHistory[index] = numBids;
+            var numTraded = 0;
+            var moneyTraded = 0f;
 
             while (currentBids.Length > 0 && currentAsks.Length > 0)
             {
@@ -421,6 +465,10 @@ public class MarketSystem : JobComponentSystem
                     // Transferring goods
                     seller.Units -= quantityTraded;
                     buyer.Units -= quantityTraded;
+
+                    // Recording history
+                    numTraded += quantityTraded;
+                    moneyTraded += clearingPrice * quantityTraded;
 
                     currentAsks[currentAsks.Length - 1] = seller;
                     currentBids[currentBids.Length - 1] = buyer;
@@ -443,7 +491,7 @@ public class MarketSystem : JobComponentSystem
                     deltaMoney.Add(buyer.Source, -clearingPrice * quantityTraded);
 
                     var memory = new float3(index, clearingPrice, currentFrame);
-                    Debug.Log(memory);
+                    //Debug.Log(memory);
 
                     goodHistory.Add(buyer.Source, memory);
                     goodHistory.Add(seller.Source, memory);
@@ -456,33 +504,63 @@ public class MarketSystem : JobComponentSystem
                     currentBids.RemoveAtSwapBack(currentBids.Length - 1);
             }
 
-            // TODO: History integration
+            TradeHistory[index] = numTraded;
+            if (numTraded > 0)
+                PriceHistory[index] = moneyTraded / numTraded;
         }
     }
 
     //[BurstCompile]
-    private struct ProcessMoneyChanges : IJobForEachWithEntity<Wallet>
+    private struct ProcessMoneyChanges : IJobForEachWithEntity<Wallet, Agent>
     {
         [ReadOnly] public NativeMultiHashMap<Entity, float> deltaMoney;
+        [ReadOnly] public EntityArchetype newAgent;
 
         [WriteOnly] public EntityCommandBuffer.Concurrent ecb;
+        [WriteOnly] public NativeMultiHashMap<Entity, float>.Concurrent profitsByLogic;
 
-        public void Execute([ReadOnly] Entity entity, [ReadOnly] int index, ref Wallet wallet)
+        public void Execute([ReadOnly] Entity entity, [ReadOnly] int index, ref Wallet wallet,
+            [ReadOnly] ref Agent agent)
         {
             if (!deltaMoney.TryGetFirstValue(entity, out var transaction, out var iterator))
                 return;
+
+            wallet.MoneyLastRound = wallet.Money;
 
             do
             {
                 wallet.Money += transaction;
             } while (deltaMoney.TryGetNextValue(out transaction, ref iterator));
 
+            wallet.Profit += wallet.Money - wallet.MoneyLastRound;
+            profitsByLogic.Add(agent.Logic, wallet.Profit);
+
             if (wallet.Money > 0)
                 return;
 
-            // Bankrupt
-            ecb.AddComponent(index, entity, new Bankrupt());
-            Debug.Log("Bankrupt: " + entity.Index);
+            // Bankrupt, creating new agent
+            ecb.DestroyEntity(index, entity);
+
+            //ecb.CreateEntity(index, newAgent);
+        }
+    }
+
+    [BurstCompile]
+    private struct CollapseProfitsByLogic : IJobForEachWithEntity<Logic>
+    {
+        [ReadOnly] public NativeMultiHashMap<Entity, float> profitsByLogic;
+
+        [NativeDisableParallelForRestriction] public NativeArray<float> profitHistory;
+
+        public void Execute([ReadOnly] Entity entity, [ReadOnly] int index, [ReadOnly] ref Logic logic)
+        {
+            if (!profitsByLogic.TryGetFirstValue(entity, out var profit, out var iterator))
+                return;
+
+            do
+            {
+                profitHistory[logic.Index] += profit;
+            } while (profitsByLogic.TryGetNextValue(out profit, ref iterator));
         }
     }
 
@@ -508,7 +586,7 @@ public class MarketSystem : JobComponentSystem
     private struct ResetMultiHashMaps : IJob
     {
         public NativeMultiHashMap<int, Offer> tradeAsks, tradeBids;
-        public NativeMultiHashMap<Entity, float> deltaMoney;
+        public NativeMultiHashMap<Entity, float> deltaMoney, profitsByLogic;
         public NativeMultiHashMap<Entity, float3> revisionism;
 
         public void Execute()
@@ -516,6 +594,7 @@ public class MarketSystem : JobComponentSystem
             tradeAsks.Clear();
             tradeBids.Clear();
             deltaMoney.Clear();
+            profitsByLogic.Clear();
             revisionism.Clear();
         }
     }

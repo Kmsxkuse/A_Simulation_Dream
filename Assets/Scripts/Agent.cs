@@ -20,16 +20,13 @@ public struct Agent : IComponentData
 public struct Wallet : IComponentData
 {
     public float Money; // Money on hand
-    //public float MoneyLastRound;
-    //public float Profit;
+    public float MoneyLastRound;
+    public float Profit;
 
-    public Wallet(float money) : this()
+    public Wallet(float money)
     {
         Money = money;
+        MoneyLastRound = money;
+        Profit = 0;
     }
-}
-
-public struct Bankrupt : IComponentData
-{
-    // Oh no!
 }
