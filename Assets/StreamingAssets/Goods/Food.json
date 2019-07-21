@@ -1,5 +1,4 @@
 {
     "name":"Food",
-    "size":1,
-    "initialCost": 1
+    "initialCost": 0.2
 }

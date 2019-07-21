@@ -16,33 +16,48 @@ public struct Logic : IComponentData
 }
 
 [InternalBufferCapacity(0)]
-public struct CostOfLiving : IBufferElementData
+public struct CostOfLivingAndLimitGood : IBufferElementData, IEquatable<CostOfLivingAndLimitGood>
 {
-    public readonly int Good;
-    public readonly int Quantity;
+    public int CostOfLiving;
+    public int LimitGoods;
 
-    public CostOfLiving(int good, int quantity)
+    public CostOfLivingAndLimitGood(int costOfLiving, int limitGoods = 999)
     {
-        Good = good;
-        Quantity = quantity;
+        CostOfLiving = costOfLiving;
+        LimitGoods = limitGoods;
+    }
+
+    public bool Equals(CostOfLivingAndLimitGood other)
+    {
+        return CostOfLiving == other.CostOfLiving && LimitGoods == other.LimitGoods;
+    }
+
+    public override bool Equals(object obj)
+    {
+        return obj is CostOfLivingAndLimitGood other && Equals(other);
+    }
+
+    public override int GetHashCode()
+    {
+        unchecked
+        {
+            return (CostOfLiving * 397) ^ LimitGoods;
+        }
+    }
+
+    public static bool operator ==(CostOfLivingAndLimitGood left, CostOfLivingAndLimitGood right)
+    {
+        return left.Equals(right);
+    }
+
+    public static bool operator !=(CostOfLivingAndLimitGood left, CostOfLivingAndLimitGood right)
+    {
+        return !left.Equals(right);
     }
 }
 
 [InternalBufferCapacity(0)]
-public struct LimitGood : IBufferElementData
-{
-    public readonly int Good;
-    public readonly int Quantity;
-
-    public LimitGood(int good, int quantity)
-    {
-        Good = good;
-        Quantity = quantity;
-    }
-}
-
-[InternalBufferCapacity(0)]
-public struct IdealQuantity : IBufferElementData
+public struct IdealQuantity : IBufferElementData, IEquatable<IdealQuantity>
 {
     private readonly int _quantity;
 
@@ -60,10 +75,35 @@ public struct IdealQuantity : IBufferElementData
     {
         return iq._quantity;
     }
+
+    public bool Equals(IdealQuantity other)
+    {
+        return _quantity == other._quantity;
+    }
+
+    public override bool Equals(object obj)
+    {
+        return obj is IdealQuantity other && Equals(other);
+    }
+
+    public override int GetHashCode()
+    {
+        return _quantity;
+    }
+
+    public static bool operator ==(IdealQuantity left, IdealQuantity right)
+    {
+        return left.Equals(right);
+    }
+
+    public static bool operator !=(IdealQuantity left, IdealQuantity right)
+    {
+        return !left.Equals(right);
+    }
 }
 
 [InternalBufferCapacity(0)]
-public struct PossibleDelta : IBufferElementData
+public struct PossibleDelta : IBufferElementData, IEquatable<PossibleDelta>
 {
     public readonly int3 Deltas; // x: Consume start. y: Produce start. z: Produce end.
 
@@ -76,10 +116,35 @@ public struct PossibleDelta : IBufferElementData
     {
         return new PossibleDelta(i);
     }
+
+    public bool Equals(PossibleDelta other)
+    {
+        return Deltas.Equals(other.Deltas);
+    }
+
+    public override bool Equals(object obj)
+    {
+        return obj is PossibleDelta other && Equals(other);
+    }
+
+    public override int GetHashCode()
+    {
+        return Deltas.GetHashCode();
+    }
+
+    public static bool operator ==(PossibleDelta left, PossibleDelta right)
+    {
+        return left.Equals(right);
+    }
+
+    public static bool operator !=(PossibleDelta left, PossibleDelta right)
+    {
+        return !left.Equals(right);
+    }
 }
 
 [InternalBufferCapacity(0)]
-public struct DeltaValue : IBufferElementData
+public struct DeltaValue : IBufferElementData, IEquatable<DeltaValue>
 {
     public readonly int Good;
     public int Quantity;
@@ -95,6 +160,31 @@ public struct DeltaValue : IBufferElementData
     public override string ToString()
     {
         return $"Good: {Good}. Quantity: {Quantity}. Possibility: {Possibility}.";
+    }
+
+    public bool Equals(DeltaValue other)
+    {
+        return Good == other.Good;
+    }
+
+    public override bool Equals(object obj)
+    {
+        return obj is DeltaValue other && Equals(other);
+    }
+
+    public override int GetHashCode()
+    {
+        return Good;
+    }
+
+    public static bool operator ==(DeltaValue left, DeltaValue right)
+    {
+        return left.Equals(right);
+    }
+
+    public static bool operator !=(DeltaValue left, DeltaValue right)
+    {
+        return !left.Equals(right);
     }
 }
 
@@ -124,7 +214,7 @@ public struct JsonDeltas
 }
 
 [Serializable]
-public struct JsonLPossibilities
+public struct JsonLPossibilities : IEquatable<JsonLPossibilities>
 {
     public string name;
     public int quantity;
@@ -136,10 +226,35 @@ public struct JsonLPossibilities
         this.quantity = quantity;
         this.possibility = possibility;
     }
+
+    public bool Equals(JsonLPossibilities other)
+    {
+        return string.Equals(name, other.name, StringComparison.OrdinalIgnoreCase);
+    }
+
+    public override bool Equals(object obj)
+    {
+        return obj is JsonLPossibilities other && Equals(other);
+    }
+
+    public override int GetHashCode()
+    {
+        return StringComparer.OrdinalIgnoreCase.GetHashCode(name);
+    }
+
+    public static bool operator ==(JsonLPossibilities left, JsonLPossibilities right)
+    {
+        return left.Equals(right);
+    }
+
+    public static bool operator !=(JsonLPossibilities left, JsonLPossibilities right)
+    {
+        return !left.Equals(right);
+    }
 }
 
 [Serializable]
-public struct JsonLValues
+public struct JsonLValues : IEquatable<JsonLValues>
 {
     public string name;
     public int quantity;
@@ -148,5 +263,30 @@ public struct JsonLValues
     {
         this.name = name;
         this.quantity = quantity;
+    }
+
+    public bool Equals(JsonLValues other)
+    {
+        return string.Equals(name, other.name, StringComparison.OrdinalIgnoreCase);
+    }
+
+    public override bool Equals(object obj)
+    {
+        return obj is JsonLValues other && Equals(other);
+    }
+
+    public override int GetHashCode()
+    {
+        return StringComparer.OrdinalIgnoreCase.GetHashCode(name);
+    }
+
+    public static bool operator ==(JsonLValues left, JsonLValues right)
+    {
+        return left.Equals(right);
+    }
+
+    public static bool operator !=(JsonLValues left, JsonLValues right)
+    {
+        return !left.Equals(right);
     }
 }

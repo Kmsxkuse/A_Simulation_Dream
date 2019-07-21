@@ -10,7 +10,7 @@ public static class History
 
     public static int GoodsCount;
 
-    public static void AssignLogs(int goodsNum)
+    public static void AssignLogs(int goodsNum, int logicNum)
     {
         GoodsCount = goodsNum;
 
@@ -30,7 +30,7 @@ public static class History
         for (var i = 0; i < Trades.Length; i++)
             Trades[i] = new List<float>();
 
-        Profits = new List<float>[goodsNum];
+        Profits = new List<float>[logicNum];
         for (var i = 0; i < Profits.Length; i++)
             Profits[i] = new List<float>();
     }

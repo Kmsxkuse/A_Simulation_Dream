@@ -6,14 +6,12 @@ using UnityEngine;
 public struct Good : IComponentData, IEquatable<Good>
 {
     public readonly int Index;
-    public readonly int SpaceOccupied;
 
     public readonly float InitialCost;
 
     public Good(int index, JsonGood jsonGood)
     {
         Index = index;
-        SpaceOccupied = jsonGood.size;
         InitialCost = jsonGood.initialCost;
     }
 
@@ -47,7 +45,6 @@ public struct Good : IComponentData, IEquatable<Good>
 public struct JsonGood
 {
     public string name;
-    public int size;
     public float initialCost;
 
     public static JsonGood CreateFromJson(string path)

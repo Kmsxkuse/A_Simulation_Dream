@@ -8,6 +8,8 @@ using UnityEngine;
 
 public class InitializeMarket : ComponentSystem
 {
+    public static Entity[] GoodsMostLogic;
+
     protected override void OnCreateManager()
     {
         var goods = new Dictionary<string, Good>();
@@ -20,81 +22,80 @@ public class InitializeMarket : ComponentSystem
         }
 
         var goodArray = goods.Values.ToList();
-
-        History.AssignLogs(goods.Count);
-        foreach (var index in goods)
-        {
-            // Start history charts with 1 fake buy/sell bid
-            History.Prices[index.Value.Index].Add(index.Value.InitialCost);
-            History.Asks[index.Value.Index].Add(index.Value.InitialCost);
-            History.Bids[index.Value.Index].Add(index.Value.InitialCost);
-            History.Trades[index.Value.Index].Add(index.Value.InitialCost);
-        }
+        var logicGoodsCounter = new int[goods.Count];
+        GoodsMostLogic = new Entity[goods.Count];
 
         var logic = new Dictionary<string, Entity>();
         var startingInventories = new Dictionary<string, NativeArray<InvContent>>();
         var startingStatistics = new Dictionary<string, NativeArray<InvStats>>();
-        var startingUsedSpace = new Dictionary<string, int>();
 
-        foreach (var logicPath in Directory.EnumerateFiles(
-            Path.Combine(Application.streamingAssetsPath, "Factories"), "*.json"))
+        var cofAndLg = new NativeArray<CostOfLivingAndLimitGood>(goods.Count, Allocator.Temp,
+            NativeArrayOptions.UninitializedMemory);
+
+        using (var possibleDeltas = new NativeList<PossibleDelta>(Allocator.Temp))
+        using (var deltas = new NativeList<DeltaValue>(Allocator.Temp))
         {
-            var jsonLogic = JsonLogic.CreateFromJson(logicPath);
-            var currentLogic = EntityManager.CreateEntity(typeof(Logic));
-            EntityManager.SetComponentData(currentLogic, new Logic(logic.Count));
-
-            using (var costOfLiving = new NativeList<CostOfLiving>(Allocator.Temp))
+            foreach (var logicPath in Directory.EnumerateFiles(
+                Path.Combine(Application.streamingAssetsPath, "Factories"), "*.json"))
             {
-                foreach (var value in jsonLogic.costOfLiving)
-                    costOfLiving.Add(new CostOfLiving(goods[value.name].Index, value.quantity));
-                EntityManager.AddBuffer<CostOfLiving>(currentLogic).AddRange(costOfLiving);
-            }
+                var jsonLogic = JsonLogic.CreateFromJson(logicPath);
+                var currentLogic = EntityManager.CreateEntity(typeof(Logic));
+                EntityManager.SetComponentData(currentLogic, new Logic(logic.Count));
 
-            using (var limitGoods = new NativeList<LimitGood>(Allocator.Temp))
-            {
-                foreach (var value in jsonLogic.limitGoods)
-                    limitGoods.Add(new LimitGood(goods[value.name].Index, value.quantity));
-                EntityManager.AddBuffer<LimitGood>(currentLogic).AddRange(limitGoods);
-            }
+                // Resetting array
+                for (var goodIndex = 0; goodIndex < cofAndLg.Length; goodIndex++)
+                    cofAndLg[goodIndex] = new CostOfLivingAndLimitGood(0);
+                // First pass for costs of living
+                foreach (var livingCost in jsonLogic.costOfLiving)
+                    cofAndLg[goods[livingCost.name].Index] = new CostOfLivingAndLimitGood(livingCost.quantity);
+                // Second pass for limit goods
+                foreach (var goodsLimit in jsonLogic.limitGoods)
+                {
+                    var index = goods[goodsLimit.name].Index;
+                    var placeholder = cofAndLg[index];
+                    placeholder.LimitGoods = goodsLimit.quantity;
+                    cofAndLg[index] = placeholder;
+                }
 
-            var idealQuantity = new NativeArray<IdealQuantity>(goods.Count, Allocator.Temp);
-            foreach (var value in jsonLogic.idealQuantity)
-                idealQuantity[goods[value.name].Index] = value.quantity;
-            EntityManager.AddBuffer<IdealQuantity>(currentLogic).AddRange(idealQuantity);
-            idealQuantity.Dispose();
+                EntityManager.AddBuffer<CostOfLivingAndLimitGood>(currentLogic).AddRange(cofAndLg);
 
-            var currentInventory = new NativeArray<InvContent>(goods.Count, Allocator.Temp);
-            var currentStatistic = new NativeArray<InvStats>(goods.Count, Allocator.Temp);
+                var idealQuantity = new NativeArray<IdealQuantity>(goods.Count, Allocator.Temp);
+                foreach (var value in jsonLogic.idealQuantity)
+                    idealQuantity[goods[value.name].Index] = value.quantity;
+                EntityManager.AddBuffer<IdealQuantity>(currentLogic).AddRange(idealQuantity);
+                idealQuantity.Dispose();
 
-            var sizeCounter = 0;
-            // Assigning starting good inventory
-            foreach (var value in jsonLogic.startQuantity)
-            {
-                var targetGood = goods[value.name];
-                currentInventory[targetGood.Index]
-                    = new InvContent(value.quantity, targetGood.SpaceOccupied, targetGood.InitialCost);
-                sizeCounter += value.quantity * targetGood.SpaceOccupied;
-            }
+                var currentInventory = new NativeArray<InvContent>(goods.Count, Allocator.Temp);
+                var currentStatistic = new NativeArray<InvStats>(goods.Count, Allocator.Temp);
 
-            // Assigning rest of goods prices and statistics
-            for (var index = 0; index < currentInventory.Length; index++)
-            {
-                currentStatistic[index] = new InvStats(goodArray[index].InitialCost);
+                // Assigning starting good inventory
+                foreach (var value in jsonLogic.startQuantity)
+                {
+                    var targetGood = goods[value.name];
+                    currentInventory[targetGood.Index] = new InvContent(value.quantity, targetGood.InitialCost);
+                }
 
-                var targetInv = currentInventory[index];
-                if (targetInv.RecordedPrice > 0.1)
-                    continue;
-                targetInv.RecordedPrice = goodArray[index].InitialCost;
-                currentInventory[index] = targetInv;
-            }
+                // Assigning rest of goods prices and statistics
+                for (var index = 0; index < currentInventory.Length; index++)
+                {
+                    var targetStats = new InvStats(goodArray[index].InitialCost);
+                    currentStatistic[index] = targetStats;
 
-            startingUsedSpace.Add(jsonLogic.name, sizeCounter);
-            startingInventories.Add(jsonLogic.name, currentInventory);
-            startingStatistics.Add(jsonLogic.name, currentStatistic);
+                    var targetInv = currentInventory[index];
+                    if (targetInv.RecordedPrice > 0.1)
+                        continue;
+                    targetInv.RecordedPrice = goodArray[index].InitialCost;
+                    currentInventory[index] = targetInv;
+                }
 
-            using (var possibleDeltas = new NativeList<PossibleDelta>(Allocator.Temp))
-            using (var deltas = new NativeList<DeltaValue>(Allocator.Temp))
-            {
+                startingInventories.Add(jsonLogic.name, currentInventory);
+                startingStatistics.Add(jsonLogic.name, currentStatistic);
+                // Starting values
+                EntityManager.AddBuffer<InvContent>(currentLogic).AddRange(currentInventory);
+                EntityManager.AddBuffer<InvStats>(currentLogic).AddRange(currentStatistic);
+
+                possibleDeltas.Clear();
+                deltas.Clear();
                 foreach (var possibilities in jsonLogic.possibleDeltas)
                 {
                     var consumeStart = deltas.Length;
@@ -103,52 +104,60 @@ public class InitializeMarket : ComponentSystem
 
                     var produceStart = deltas.Length;
                     foreach (var value in possibilities.produces)
-                        deltas.Add(new DeltaValue(goods[value.name].Index, value.quantity, value.possibility));
+                    {
+                        var goodsIndex = goods[value.name].Index;
+                        deltas.Add(new DeltaValue(goodsIndex, value.quantity, value.possibility));
+
+                        if (logicGoodsCounter[goods[value.name].Index] > math.abs(value.quantity))
+                            continue;
+
+                        logicGoodsCounter[goodsIndex] = value.quantity;
+                        GoodsMostLogic[goodsIndex] = currentLogic;
+                    }
 
                     possibleDeltas.Add(new int3(consumeStart, produceStart, deltas.Length));
                 }
 
                 EntityManager.AddBuffer<PossibleDelta>(currentLogic).AddRange(possibleDeltas);
                 EntityManager.AddBuffer<DeltaValue>(currentLogic).AddRange(deltas);
-            }
 
-            logic.Add(jsonLogic.name, currentLogic);
+                logic.Add(jsonLogic.name, currentLogic);
+            }
         }
 
-        // DEBUG
-        var counter = 0;
+        History.AssignLogs(goods.Count, logic.Count);
 
-        CreateAgent("Farm", 100);
-        CreateAgent("Farm", 100);
-        CreateAgent("Farm", 100);
-        CreateAgent("Farm", 100);
-        CreateAgent("Farm", 100);
-        CreateAgent("Farm", 100);
+        // DEBUG
+
+        for (var counter = 0; counter < 20; counter++)
+            CreateAgent("Farm", 50);
 
         CreateAgent("Mine", 100);
+        CreateAgent("Ore_Refinery", 100);
+        CreateAgent("Ore_Refinery", 100);
         CreateAgent("Ore_Refinery", 100);
         CreateAgent("Sawmill", 100);
         CreateAgent("Sawmill", 100);
         CreateAgent("Smithy", 100);
         CreateAgent("Smithy", 100);
-        CreateAgent("Peasant", 50);
-        CreateAgent("Peasant", 50);
-        CreateAgent("Peasant", 50);
-        CreateAgent("Peasant", 50);
-        CreateAgent("Peasant", 50);
+
+        for (var counter = 0; counter < 40; counter++)
+            CreateAgent("Peasant", 20);
 
         foreach (var startingInventory in startingInventories)
             startingInventory.Value.Dispose();
         foreach (var startingStatistic in startingStatistics)
             startingStatistic.Value.Dispose();
+        cofAndLg.Dispose();
 
         void CreateAgent(string factoryType, int wealth)
         {
             var currentAgent = EntityManager.CreateEntity(typeof(Agent), typeof(Wallet));
-            EntityManager.SetComponentData(currentAgent, new Agent(++counter, logic[factoryType]));
+            EntityManager.SetComponentData(currentAgent, new Agent(logic[factoryType]));
             EntityManager.SetComponentData(currentAgent, new Wallet(wealth));
             EntityManager.AddBuffer<InvContent>(currentAgent).AddRange(startingInventories[factoryType]);
             EntityManager.AddBuffer<InvStats>(currentAgent).AddRange(startingStatistics[factoryType]);
+            Debug.Log(factoryType + " index: " + currentAgent.Index);
         }
     }
 

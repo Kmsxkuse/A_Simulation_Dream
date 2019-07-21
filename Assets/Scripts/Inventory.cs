@@ -3,15 +3,13 @@
 [InternalBufferCapacity(0)]
 public struct InvContent : IBufferElementData
 {
-    public readonly int Size;
     public float RecordedPrice;
     public int Quantity;
 
-    public InvContent(int quantity, int size, float recordedPrice)
+    public InvContent(int quantity, float recordedPrice)
     {
         RecordedPrice = recordedPrice;
         Quantity = quantity;
-        Size = size;
     }
 
     public override string ToString()

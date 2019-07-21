@@ -1,23 +1,19 @@
-﻿using Unity.Entities;
+﻿using System;
+using Unity.Entities;
 
 public struct Agent : IComponentData
 {
-    public readonly int Index;
     public readonly Entity Logic;
 
     //public int NumProduct; // on market
 
-    // Starving = true when unable to meet cost of living.
-    public bool Starving;
-
-    public Agent(int index, Entity logic) : this()
+    public Agent(Entity logic)
     {
-        Index = index;
         Logic = logic;
     }
 }
 
-public struct Wallet : IComponentData
+public struct Wallet : IComponentData, IEquatable<Wallet>
 {
     public float Money; // Money on hand
     public float MoneyLastRound;
@@ -28,5 +24,36 @@ public struct Wallet : IComponentData
         Money = money;
         MoneyLastRound = money;
         Profit = 0;
+    }
+
+    public bool Equals(Wallet other)
+    {
+        return Money.Equals(other.Money) && MoneyLastRound.Equals(other.MoneyLastRound) && Profit.Equals(other.Profit);
+    }
+
+    public override bool Equals(object obj)
+    {
+        return obj is Wallet other && Equals(other);
+    }
+
+    public override int GetHashCode()
+    {
+        unchecked
+        {
+            var hashCode = Money.GetHashCode();
+            hashCode = (hashCode * 397) ^ MoneyLastRound.GetHashCode();
+            hashCode = (hashCode * 397) ^ Profit.GetHashCode();
+            return hashCode;
+        }
+    }
+
+    public static bool operator ==(Wallet left, Wallet right)
+    {
+        return left.Equals(right);
+    }
+
+    public static bool operator !=(Wallet left, Wallet right)
+    {
+        return !left.Equals(right);
     }
 }
