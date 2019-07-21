@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+﻿using System;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
@@ -209,7 +209,7 @@ public class MarketSystem : JobComponentSystem
         _goodsMostLogic.Dispose();
     }
 
-    private struct Offer
+    private struct Offer : IComparable<Offer>
     {
         public readonly Entity Source;
         public int Units;
@@ -225,6 +225,31 @@ public class MarketSystem : JobComponentSystem
         public override string ToString()
         {
             return $"Source: {Source.Index}. Units: {Units}. Cost: {Cost}.";
+        }
+
+        public int CompareTo(Offer other)
+        {
+            return -Cost.CompareTo(other.Cost);
+        }
+
+        public static bool operator <(Offer left, Offer right)
+        {
+            return left.CompareTo(right) < 0;
+        }
+
+        public static bool operator >(Offer left, Offer right)
+        {
+            return left.CompareTo(right) > 0;
+        }
+
+        public static bool operator <=(Offer left, Offer right)
+        {
+            return left.CompareTo(right) <= 0;
+        }
+
+        public static bool operator >=(Offer left, Offer right)
+        {
+            return left.CompareTo(right) >= 0;
         }
     }
 
@@ -459,8 +484,7 @@ public class MarketSystem : JobComponentSystem
                 } while (tradeAsks.TryGetNextValue(out currentOffer, ref iterator));
 
                 // Descending order (3, 2, 1). Normally left.CompareTo(right) for ascending order (1, 2, 3)
-                currentAsks.AsArray().Sort(Comparer<Offer>.Create(
-                    (left, right) => right.Cost.CompareTo(left.Cost)));
+                currentAsks.AsArray().Sort();
             }
 
             if (tradeBids.TryGetFirstValue(index, out currentOffer, out iterator))
@@ -595,7 +619,7 @@ public class MarketSystem : JobComponentSystem
         }
     }
 
-    [BurstCompile]
+    //[BurstCompile]
     private struct ReplaceBankruptcies : IJob
     {
         [ReadOnly] public NativeArray<float> profitHistory, ratioHistory;
