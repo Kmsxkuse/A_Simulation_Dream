@@ -15,7 +15,11 @@
     "idealQuantity": [
         {
             "name": "Food",
-            "quantity": 3
+            "quantity": 5
+        },
+        {
+            "name": "Tools",
+            "quantity": 2
         },
         {
             "name": "Work",
@@ -25,17 +29,32 @@
     "startQuantity": [
         {
             "name": "Food",
-            "quantity": 1
+            "quantity": 3
         }
     ],
     "possibleDeltas": [
         {
-            "requirements": [],
+            "consumes": [
+                {
+                    "name": "Food",
+                    "quantity": -4,
+                    "possibility": 1.0
+                }
+            ],
+            "produces": [
+                {
+                    "name": "Work",
+                    "quantity": -5,
+                    "possibility": 1.0
+                }
+            ]
+        },
+        {
             "consumes": [],
             "produces": [
                 {
                     "name": "Work",
-                    "quantity": 1,
+                    "quantity": 2,
                     "possibility": 1.0
                 }
             ]

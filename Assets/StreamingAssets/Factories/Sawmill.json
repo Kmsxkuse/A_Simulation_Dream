@@ -9,17 +9,17 @@
     "limitGoods": [
         {
             "name": "Wood",
-            "quantity": 4
+            "quantity": 10
         }
     ],
     "idealQuantity": [
         {
             "name": "Food",
-            "quantity": 3
+            "quantity": 4
         },
         {
             "name": "Tools",
-            "quantity": 1
+            "quantity": 3
         },
         {
             "name": "Wood",
@@ -29,11 +29,11 @@
     "startQuantity": [
         {
             "name": "Food",
-            "quantity": 1
+            "quantity": 3
         },
         {
             "name": "Tools",
-            "quantity": 1
+            "quantity": 2
         }
     ],
     "possibleDeltas": [
@@ -42,13 +42,18 @@
                 {
                     "name": "Tools",
                     "quantity": 1,
-                    "possibility": 0.10000000149011612
+                    "possibility": 0.5
+                },
+                {
+                    "name": "Food",
+                    "quantity": -3,
+                    "possibility": 1
                 }
             ],
             "produces": [
                 {
                     "name": "Wood",
-                    "quantity": 2,
+                    "quantity": -5,
                     "possibility": 1.0
                 }
             ]
@@ -58,7 +63,7 @@
             "produces": [
                 {
                     "name": "Wood",
-                    "quantity": 1,
+                    "quantity": 2,
                     "possibility": 1.0
                 }
             ]

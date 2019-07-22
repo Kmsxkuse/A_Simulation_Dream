@@ -4,9 +4,9 @@
 public struct InvContent : IBufferElementData
 {
     public float RecordedPrice;
-    public int Quantity;
+    public float Quantity;
 
-    public InvContent(int quantity, float recordedPrice)
+    public InvContent(float quantity, float recordedPrice)
     {
         RecordedPrice = recordedPrice;
         Quantity = quantity;

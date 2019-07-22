@@ -1,10 +1,15 @@
 {
     "name": "Farm",
-    "costOfLiving": [],
+    "costOfLiving": [
+        {
+            "name": "Money",
+            "quantity": 0
+        }
+    ],
     "limitGoods": [
         {
             "name": "Food",
-            "quantity": 10
+            "quantity": 20
         }
     ],
     "idealQuantity": [
@@ -14,7 +19,7 @@
         },
         {
             "name": "Tools",
-            "quantity": 2
+            "quantity": 3
         },
         {
             "name": "Wood",
@@ -22,21 +27,21 @@
         },
         {
             "name": "Work",
-            "quantity": 4
+            "quantity": 3
         }
     ],
     "startQuantity": [
         {
-            "name": "Food",
-            "quantity": 1
-        },
-        {
             "name": "Tools",
-            "quantity": 1
+            "quantity": 2
         },
         {
             "name": "Work",
-            "quantity": 1
+            "quantity": 2
+        },
+        {
+            "name": "Wood",
+            "quantity": 2
         }
     ],
     "possibleDeltas": [
@@ -45,75 +50,23 @@
                 {
                     "name": "Wood",
                     "quantity": 1,
-                    "possibility": 0.7
+                    "possibility": 1
                 },
                 {
                     "name": "Tools",
-                    "quantity": 1,
-                    "possibility": 0.8
-                },
-                {
-                    "name": "Work",
-                    "quantity": 2,
-                    "possibility": 1.0
-                },
-                {
-                    "name": "Work",
-                    "quantity": 1,
-                    "possibility": 0.7
-                }
-            ],
-            "produces": [
-                {
-                    "name": "Food",
-                    "quantity": 10,
-                    "possibility": 1.0
-                }
-            ]
-        },
-        {
-            "consumes": [
-                {
-                    "name": "Wood",
-                    "quantity": 1,
-                    "possibility": 0.7
-                },
-                {
-                    "name": "Tools",
-                    "quantity": 1,
+                    "quantity": -3,
                     "possibility": 0.1
                 },
                 {
                     "name": "Work",
-                    "quantity": 3,
-                    "possibility": 1.0
+                    "quantity": 1,
+                    "possibility": 1
                 }
             ],
             "produces": [
                 {
                     "name": "Food",
-                    "quantity": 6,
-                    "possibility": 1.0
-                }
-            ]
-        },
-        {
-            "consumes": [
-                {
-                    "name": "Work",
-                    "quantity": 1,
-                    "possibility": 0.7
-                },
-                {
-                    "name": "Work",
-                    "quantity": 1,
-                    "possibility": 0.2
-                }
-            ],
-            "produces": [
-                {
-                    "name": "Food",
-                    "quantity": 4,
+                    "quantity": -4,
                     "possibility": 1.0
                 }
             ]

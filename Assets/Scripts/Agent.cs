@@ -1,15 +1,22 @@
 ﻿using System;
 using Unity.Entities;
 
+public struct AgTag : IComponentData
+{
+    
+}
+
 public struct Agent : IComponentData
 {
     public readonly Entity Logic;
-
-    //public int NumProduct; // on market
+    public bool Skipping;
+    public float AverageRequirement;
 
     public Agent(Entity logic)
     {
         Logic = logic;
+        Skipping = false;
+        AverageRequirement = 0;
     }
 }
 

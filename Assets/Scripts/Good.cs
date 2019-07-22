@@ -15,6 +15,12 @@ public struct Good : IComponentData, IEquatable<Good>
         InitialCost = jsonGood.initialCost;
     }
 
+    public Good(int index, float initialCost)
+    {
+        Index = index;
+        InitialCost = initialCost;
+    }
+
     public bool Equals(Good other)
     {
         return Index == other.Index;

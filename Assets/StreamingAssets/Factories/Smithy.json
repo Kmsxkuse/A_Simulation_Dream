@@ -9,13 +9,13 @@
     "limitGoods": [
         {
             "name": "Tools",
-            "quantity": 4
+            "quantity": 6
         }
     ],
     "idealQuantity": [
         {
             "name": "Food",
-            "quantity": 3
+            "quantity": 4
         },
         {
             "name": "Tools",
@@ -23,13 +23,21 @@
         },
         {
             "name": "Metal",
-            "quantity": 5
+            "quantity": 6
+        },
+        {
+            "name": "Work",
+            "quantity": 4
         }
     ],
     "startQuantity": [
         {
             "name": "Food",
-            "quantity": 1
+            "quantity": 3
+        },
+        {
+            "name": "Metal",
+            "quantity": 3
         }
     ],
     "possibleDeltas": [
@@ -37,14 +45,40 @@
             "consumes": [
                 {
                     "name": "Metal",
-                    "quantity": 1,
+                    "quantity": -6,
+                    "possibility": 0.75
+                },
+                {
+                    "name": "Work",
+                    "quantity": 2,
+                    "possibility": 0.5
+                },
+                {
+                    "name": "Food",
+                    "quantity": 2,
+                    "possibility": 1
+                }
+            ],
+            "produces": [
+                {
+                    "name": "Tools",
+                    "quantity": -2,
+                    "possibility": 1.0
+                }
+            ]
+        },
+        {
+            "consumes": [
+                {
+                    "name": "Metal",
+                    "quantity": -2,
                     "possibility": 1.0
                 }
             ],
             "produces": [
                 {
                     "name": "Tools",
-                    "quantity": 1,
+                    "quantity": -1,
                     "possibility": 1.0
                 }
             ]

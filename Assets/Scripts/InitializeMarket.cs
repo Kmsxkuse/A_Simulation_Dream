@@ -9,21 +9,30 @@ using UnityEngine;
 public class InitializeMarket : ComponentSystem
 {
     public static Entity[] GoodsMostLogic;
+    public static List<string> GoodNames, LogicNames;
 
     protected override void OnCreateManager()
     {
         var goods = new Dictionary<string, Good>();
+        GoodNames = new List<string>();
+        LogicNames = new List<string>();
 
         foreach (var goodPath in Directory.EnumerateFiles(
             Path.Combine(Application.streamingAssetsPath, "Goods"), "*.json"))
         {
             var jsonGood = JsonGood.CreateFromJson(goodPath);
             goods.Add(jsonGood.name, new Good(goods.Count, jsonGood));
+            GoodNames.Add(jsonGood.name);
         }
+        
+        // Adding simply money. Will always be the last value.
+        goods.Add("Money", new Good(goods.Count, 1));
+
+        var adjustedGoodsCount = goods.Count - 1;
 
         var goodArray = goods.Values.ToList();
-        var logicGoodsCounter = new int[goods.Count];
-        GoodsMostLogic = new Entity[goods.Count];
+        var logicGoodsCounter = new int[adjustedGoodsCount];
+        GoodsMostLogic = new Entity[adjustedGoodsCount];
 
         var logic = new Dictionary<string, Entity>();
         var startingInventories = new Dictionary<string, NativeArray<InvContent>>();
@@ -59,14 +68,14 @@ public class InitializeMarket : ComponentSystem
 
                 EntityManager.AddBuffer<CostOfLivingAndLimitGood>(currentLogic).AddRange(cofAndLg);
 
-                var idealQuantity = new NativeArray<IdealQuantity>(goods.Count, Allocator.Temp);
+                var idealQuantity = new NativeArray<IdealQuantity>(adjustedGoodsCount, Allocator.Temp);
                 foreach (var value in jsonLogic.idealQuantity)
                     idealQuantity[goods[value.name].Index] = value.quantity;
                 EntityManager.AddBuffer<IdealQuantity>(currentLogic).AddRange(idealQuantity);
                 idealQuantity.Dispose();
 
-                var currentInventory = new NativeArray<InvContent>(goods.Count, Allocator.Temp);
-                var currentStatistic = new NativeArray<InvStats>(goods.Count, Allocator.Temp);
+                var currentInventory = new NativeArray<InvContent>(adjustedGoodsCount, Allocator.Temp);
+                var currentStatistic = new NativeArray<InvStats>(adjustedGoodsCount, Allocator.Temp);
 
                 // Assigning starting good inventory
                 foreach (var value in jsonLogic.startQuantity)
@@ -122,27 +131,32 @@ public class InitializeMarket : ComponentSystem
                 EntityManager.AddBuffer<DeltaValue>(currentLogic).AddRange(deltas);
 
                 logic.Add(jsonLogic.name, currentLogic);
+                LogicNames.Add(jsonLogic.name);
             }
         }
 
-        History.AssignLogs(goods.Count, logic.Count);
+        // Subtract 1 for money being the last good.
+        History.AssignLogs(adjustedGoodsCount, logic.Count);
 
         // DEBUG
 
+        for (var counter = 0; counter < 10; counter++)
+            CreateAgent("Farm", 20);
+
+        for (var counter = 0; counter < 10; counter++)
+            CreateAgent("Mine", 50);
+        
+        for (var counter = 0; counter < 10; counter++)
+            CreateAgent("Ore_Refinery", 50);
+        
+        for (var counter = 0; counter < 10; counter++)
+            CreateAgent("Sawmill", 50);
+        
+        for (var counter = 0; counter < 10; counter++)
+            CreateAgent("Smithy", 100);
+
         for (var counter = 0; counter < 20; counter++)
-            CreateAgent("Farm", 50);
-
-        CreateAgent("Mine", 100);
-        CreateAgent("Ore_Refinery", 100);
-        CreateAgent("Ore_Refinery", 100);
-        CreateAgent("Ore_Refinery", 100);
-        CreateAgent("Sawmill", 100);
-        CreateAgent("Sawmill", 100);
-        CreateAgent("Smithy", 100);
-        CreateAgent("Smithy", 100);
-
-        for (var counter = 0; counter < 40; counter++)
-            CreateAgent("Peasant", 20);
+            CreateAgent("Peasant", 50);
 
         foreach (var startingInventory in startingInventories)
             startingInventory.Value.Dispose();
@@ -152,12 +166,11 @@ public class InitializeMarket : ComponentSystem
 
         void CreateAgent(string factoryType, int wealth)
         {
-            var currentAgent = EntityManager.CreateEntity(typeof(Agent), typeof(Wallet));
+            var currentAgent = EntityManager.CreateEntity(typeof(AgTag), typeof(Agent), typeof(Wallet));
             EntityManager.SetComponentData(currentAgent, new Agent(logic[factoryType]));
             EntityManager.SetComponentData(currentAgent, new Wallet(wealth));
             EntityManager.AddBuffer<InvContent>(currentAgent).AddRange(startingInventories[factoryType]);
             EntityManager.AddBuffer<InvStats>(currentAgent).AddRange(startingStatistics[factoryType]);
-            Debug.Log(factoryType + " index: " + currentAgent.Index);
         }
     }
 
