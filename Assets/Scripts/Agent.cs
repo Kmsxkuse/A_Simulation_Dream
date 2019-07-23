@@ -3,7 +3,6 @@ using Unity.Entities;
 
 public struct AgTag : IComponentData
 {
-    
 }
 
 public struct Agent : IComponentData
@@ -17,6 +16,17 @@ public struct Agent : IComponentData
         Logic = logic;
         Skipping = false;
         AverageRequirement = 0;
+    }
+}
+
+public struct BankruptcyInfo
+{
+    public readonly Entity Agent, Logic;
+
+    public BankruptcyInfo(Entity agent, Entity logic)
+    {
+        Agent = agent;
+        Logic = logic;
     }
 }
 
