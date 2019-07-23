@@ -19,15 +19,15 @@
         },
         {
             "name": "Tools",
-            "quantity": 3
+            "quantity": 2
         },
         {
             "name": "Wood",
-            "quantity": 3
+            "quantity": 5
         },
         {
             "name": "Work",
-            "quantity": 3
+            "quantity": 4
         }
     ],
     "startQuantity": [
@@ -37,11 +37,11 @@
         },
         {
             "name": "Work",
-            "quantity": 2
+            "quantity": 3
         },
         {
             "name": "Wood",
-            "quantity": 2
+            "quantity": 4
         }
     ],
     "possibleDeltas": [
@@ -49,24 +49,24 @@
             "consumes": [
                 {
                     "name": "Wood",
-                    "quantity": 1,
+                    "quantity": -4,
                     "possibility": 1
                 },
                 {
                     "name": "Tools",
-                    "quantity": -3,
-                    "possibility": 0.1
+                    "quantity": 1,
+                    "possibility": 0.5
                 },
                 {
                     "name": "Work",
-                    "quantity": 1,
+                    "quantity": 2,
                     "possibility": 1
                 }
             ],
             "produces": [
                 {
                     "name": "Food",
-                    "quantity": -4,
+                    "quantity": -2,
                     "possibility": 1.0
                 }
             ]

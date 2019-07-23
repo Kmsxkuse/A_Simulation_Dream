@@ -55,11 +55,11 @@ public class History : MonoBehaviour
         
         _lines = new List<LineRenderer[]>
         {
-            new LineRenderer[GoodsCount]
+            new LineRenderer[LogicsCount]
         };
         _lineLabels = new List<Transform[]>
         {
-            new Transform[GoodsCount]
+            new Transform[LogicsCount]
         };
         for (var chartIndex = 0; chartIndex < _lines.Count; chartIndex++)
         {
@@ -72,7 +72,7 @@ public class History : MonoBehaviour
                 targetLine.endColor = targetLine.startColor = lineColor;
                 chartType[index] = targetLine;
                 var targetLabel = Instantiate(lineLabel, transform);
-                targetLabel.GetComponent<TextMeshPro>().text = InitializeMarket.GoodNames[index];
+                targetLabel.GetComponent<TextMeshPro>().text = InitializeMarket.LogicNames[index];
                 labels[index] = targetLabel.transform;
             }
         }
@@ -111,7 +111,7 @@ public class History : MonoBehaviour
         yield return new WaitForSecondsRealtime(0.005f);
         
         // Ask history section
-        ProcessArrayToLines(_marketSystem.ratioHistory, 0);
+        ProcessArrayToLines(_marketSystem.profitsHistory, 0);
         _marketSystem.Update();
         _updateLoop = null;
     }
@@ -174,8 +174,8 @@ public class History : MonoBehaviour
         pointsList.AddRange(targetList.Select(t => new List<Vector3>(21 * targetList.Length)));
         
         foreach (var point in circularQueue)
-            pointsList[(int) point.z].Add(new Vector3(point.y / 19f * 0.9005f - 0.45f, 
-                point.x / _maximums[listIndex] * 0.9f - 0.45f));
+            pointsList[(int) point.z].Add(new Vector3(point.y / 19f * 0.902f - 0.45f, 
+                point.x / (_maximums[listIndex] + math.abs(_minimums[listIndex])) * 0.9f - 0.45f));
 
         for (var index = 0; index < pointsList.Count; index++)
         {

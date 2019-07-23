@@ -711,7 +711,7 @@ public class MarketSystem : JobComponentSystem
 
                 replaceEntity = ecb.CreateEntity(agentArch);
                 ecb.SetComponent(replaceEntity, new Agent(targetLogic));
-                ecb.SetComponent(replaceEntity, new Wallet(10));
+                ecb.SetComponent(replaceEntity, new Wallet(30));
                 ecb.AddBuffer<InvContent>(replaceEntity).AddRange(sC);
                 ecb.AddBuffer<InvStats>(replaceEntity).AddRange(sS);
             }

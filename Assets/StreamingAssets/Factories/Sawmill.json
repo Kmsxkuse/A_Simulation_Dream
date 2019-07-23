@@ -42,7 +42,7 @@
                 {
                     "name": "Tools",
                     "quantity": 1,
-                    "possibility": 0.5
+                    "possibility": 1
                 },
                 {
                     "name": "Food",
