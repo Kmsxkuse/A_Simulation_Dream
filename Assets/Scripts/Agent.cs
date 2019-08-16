@@ -1,10 +1,6 @@
 ﻿using System;
 using Unity.Entities;
 
-public struct AgTag : IComponentData
-{
-}
-
 public struct Agent : IComponentData
 {
     public readonly Entity Logic;

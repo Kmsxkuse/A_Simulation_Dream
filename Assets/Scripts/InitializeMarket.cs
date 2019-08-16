@@ -24,7 +24,7 @@ public class InitializeMarket : ComponentSystem
             goods.Add(jsonGood.name, new Good(goods.Count, jsonGood));
             GoodNames.Add(jsonGood.name);
         }
-        
+
         // Adding simply money. Will always be the last value.
         goods.Add("Money", new Good(goods.Count, 1));
 
@@ -36,7 +36,6 @@ public class InitializeMarket : ComponentSystem
 
         var logic = new Dictionary<string, Entity>();
         var startingInventories = new Dictionary<string, NativeArray<InvContent>>();
-        var startingStatistics = new Dictionary<string, NativeArray<InvStats>>();
 
         var cofAndLg = new NativeArray<CostOfLivingAndLimitGood>(goods.Count, Allocator.Temp,
             NativeArrayOptions.UninitializedMemory);
@@ -75,7 +74,6 @@ public class InitializeMarket : ComponentSystem
                 idealQuantity.Dispose();
 
                 var currentInventory = new NativeArray<InvContent>(adjustedGoodsCount, Allocator.Temp);
-                var currentStatistic = new NativeArray<InvStats>(adjustedGoodsCount, Allocator.Temp);
 
                 // Assigning starting good inventory
                 foreach (var value in jsonLogic.startQuantity)
@@ -84,12 +82,9 @@ public class InitializeMarket : ComponentSystem
                     currentInventory[targetGood.Index] = new InvContent(value.quantity, targetGood.InitialCost);
                 }
 
-                // Assigning rest of goods prices and statistics
+                // Assigning rest of goods prices
                 for (var index = 0; index < currentInventory.Length; index++)
                 {
-                    var targetStats = new InvStats(goodArray[index].InitialCost);
-                    currentStatistic[index] = targetStats;
-
                     var targetInv = currentInventory[index];
                     if (targetInv.RecordedPrice > 0.1)
                         continue;
@@ -98,10 +93,8 @@ public class InitializeMarket : ComponentSystem
                 }
 
                 startingInventories.Add(jsonLogic.name, currentInventory);
-                startingStatistics.Add(jsonLogic.name, currentStatistic);
                 // Starting values
                 EntityManager.AddBuffer<InvContent>(currentLogic).AddRange(currentInventory);
-                EntityManager.AddBuffer<InvStats>(currentLogic).AddRange(currentStatistic);
 
                 possibleDeltas.Clear();
                 deltas.Clear();
@@ -145,13 +138,13 @@ public class InitializeMarket : ComponentSystem
 
         for (var counter = 0; counter < 10; counter++)
             CreateAgent("Mine", 50);
-        
+
         for (var counter = 0; counter < 10; counter++)
             CreateAgent("Ore_Refinery", 50);
-        
+
         for (var counter = 0; counter < 10; counter++)
             CreateAgent("Sawmill", 50);
-        
+
         for (var counter = 0; counter < 10; counter++)
             CreateAgent("Smithy", 100);
 
@@ -160,17 +153,14 @@ public class InitializeMarket : ComponentSystem
 
         foreach (var startingInventory in startingInventories)
             startingInventory.Value.Dispose();
-        foreach (var startingStatistic in startingStatistics)
-            startingStatistic.Value.Dispose();
         cofAndLg.Dispose();
 
         void CreateAgent(string factoryType, int wealth)
         {
-            var currentAgent = EntityManager.CreateEntity(typeof(AgTag), typeof(Agent), typeof(Wallet));
+            var currentAgent = EntityManager.CreateEntity(typeof(Agent), typeof(Wallet));
             EntityManager.SetComponentData(currentAgent, new Agent(logic[factoryType]));
             EntityManager.SetComponentData(currentAgent, new Wallet(wealth));
             EntityManager.AddBuffer<InvContent>(currentAgent).AddRange(startingInventories[factoryType]);
-            EntityManager.AddBuffer<InvStats>(currentAgent).AddRange(startingStatistics[factoryType]);
         }
     }
 

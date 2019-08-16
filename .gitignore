@@ -10,6 +10,9 @@
 [Ll]ogs/
 [Ee]ntityCache/
 
+### Jetbrains ###
+.idea/
+
 ### Copywrited content! ###
 [Ff]lags/
 

@@ -17,19 +17,3 @@ public struct InvContent : IBufferElementData
         return $"Quantity: {Quantity}. Recorded Price: {RecordedPrice}.";
     }
 }
-
-[InternalBufferCapacity(0)]
-public struct InvStats : IBufferElementData
-{
-    public int Transactions;
-
-    public float Mean, Minimum, Maximum;
-
-    public InvStats(float mean)
-    {
-        Mean = mean;
-        Minimum = mean;
-        Maximum = mean * 3;
-        Transactions = 0;
-    }
-}
