@@ -11,7 +11,7 @@ public class InitializeMarket : ComponentSystem
     public static Entity[] GoodsMostLogic;
     public static List<string> GoodNames, LogicNames;
 
-    protected override void OnCreateManager()
+    protected override void OnCreate()
     {
         var goods = new Dictionary<string, Good>();
         GoodNames = new List<string>();
@@ -133,22 +133,24 @@ public class InitializeMarket : ComponentSystem
 
         // DEBUG
 
-        for (var counter = 0; counter < 10; counter++)
+        // GOAL: 605 PER!
+        const int current = 1000;
+        for (var counter = 0; counter < current; counter++)
             CreateAgent("Farm", 20);
 
-        for (var counter = 0; counter < 10; counter++)
+        for (var counter = 0; counter < current; counter++)
             CreateAgent("Mine", 50);
 
-        for (var counter = 0; counter < 10; counter++)
+        for (var counter = 0; counter < current; counter++)
             CreateAgent("Ore_Refinery", 50);
 
-        for (var counter = 0; counter < 10; counter++)
+        for (var counter = 0; counter < current; counter++)
             CreateAgent("Sawmill", 50);
 
-        for (var counter = 0; counter < 10; counter++)
+        for (var counter = 0; counter < current; counter++)
             CreateAgent("Smithy", 100);
 
-        for (var counter = 0; counter < 20; counter++)
+        for (var counter = 0; counter < current; counter++)
             CreateAgent("Peasant", 50);
 
         foreach (var startingInventory in startingInventories)
